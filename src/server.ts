@@ -10,6 +10,7 @@ import cors from "cors";
 import authRoutes from "./routes/auth.route";
 import uploadRoutes from "./routes/upload.route";
 import carRoutes from "./routes/cars.route";
+import userRoutes from "./routes/user.route";
 
 const limiter = rateLimit({
   windowMs: 60 * 1000,
@@ -43,6 +44,7 @@ const port = process.env.PORT || 3000;
 app.use("/api/auth", authRoutes);
 app.use("/api/image", uploadRoutes);
 app.use("/api/cars", carRoutes);
+app.use("/api/user", userRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).send("Working 👌");

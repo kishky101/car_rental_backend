@@ -104,7 +104,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/add", verifyFirebaseToken, async (req, res) => {
+router.post("/add", async (req, res) => {
   try {
     const {
       image,
@@ -118,7 +118,7 @@ router.post("/add", verifyFirebaseToken, async (req, res) => {
       category,
     } = req.body;
 
-    const uid = (req as any).user.uid;
+    // const uid = (req as any).user.uid;
 
     // Basic validation
     if (!title || !price || !category || !seats || !transmission) {
@@ -139,7 +139,7 @@ router.post("/add", verifyFirebaseToken, async (req, res) => {
       features: Array.isArray(features) ? features : [],
       category,
       isAvailable: true,
-      addedBy: uid,
+      // addedBy: uid,
       addedAt: Date.now(),
     };
 
