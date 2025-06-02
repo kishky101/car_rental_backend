@@ -70,7 +70,10 @@ router.get("/", async (req, res) => {
     }
 
     // Convert object to array
-    let cars = Object.values(carsData);
+    let cars = Object.entries(carsData).map(([id, car]: [string, any]) => ({
+      id,
+      ...car,
+    }));
 
     // Filter by availability
     if (available === "true") {
@@ -155,15 +158,30 @@ router.post("/add", async (req, res) => {
 
 router.post("/rent", verifyFirebaseToken, async (req, res) => {
   try {
-    const { carId, rentalStart, rentalEnd } = req.body;
+    console.log("Rent request body:", req.body);
+    
+    const {
+      carId,
+      color,
+      fuelType,
+      modelYear,
+      specialRequests,
+      paymentMethod,
+      startDate,
+      endDate,
+      cardName,
+      cardNumber,
+      expiry,
+      cvv,
+    } = req.body;
+
     const uid = (req as any).user.uid;
 
-    if (!carId || !rentalStart || !rentalEnd) {
+    if (!carId || !startDate || !endDate) {
       res.status(400).json({ message: "Missing required fields" });
       return;
     }
 
-    // Check if car exists and is available
     const carSnapshot = await db.ref(`cars/${carId}`).once("value");
     const car = carSnapshot.val();
 
@@ -177,21 +195,31 @@ router.post("/rent", verifyFirebaseToken, async (req, res) => {
       return;
     }
 
-    // Create rental record
-    const rentalData = {
+    const rentalData: Record<string, any> = {
       carId,
-      rentalStart,
-      rentalEnd,
+      color,
+      fuelType,
+      modelYear,
+      specialRequests,
+      paymentMethod,
+      startDate,
+      endDate,
       rentedAt: Date.now(),
     };
 
-    await db.ref(`rentals/${uid}`).push(rentalData);
+    if (paymentMethod === "card") {
+      rentalData.card = {
+        cardName,
+        cardNumber,
+        expiry,
+        cvv,
+      };
+    }
 
-    // Optionally update car availability
+    await db.ref(`rentals/${uid}`).push(rentalData);
     await db.ref(`cars/${carId}`).update({ isAvailable: false });
 
     res.json({ message: "Car rented successfully" });
-    return;
   } catch (err) {
     console.error("Rent error:", err);
     res.status(500).json({ message: "Internal server error" });
