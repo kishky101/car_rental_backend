@@ -159,7 +159,7 @@ router.post("/add", async (req, res) => {
 router.post("/rent", verifyFirebaseToken, async (req, res) => {
   try {
     console.log("Rent request body:", req.body);
-    
+
     const {
       carId,
       color,
@@ -294,6 +294,71 @@ router.post("/remove", verifyFirebaseToken, async (req, res) => {
     res.status(200).json({ message: "Car removed successfully" });
   } catch (err) {
     console.error("Remove car error:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.get("/rentals", verifyFirebaseToken, async (req, res) => {
+  try {
+    const uid = (req as any).user.uid;
+    const filterType = req.query.type; // past | current | future (optional)
+
+    const now = Date.now();
+
+    // console.log(uid);
+    // 1. Get user's rentals
+    const rentalsSnap = await db.ref(`rentals/${uid}`).once("value");
+    const rentalsData = rentalsSnap.val();
+
+    // console.log(rentalsData);
+
+    if (!rentalsData) {
+      res.json([]);
+      return;
+    }
+
+    const rentals = Object.entries(rentalsData).map(([id, rental]: any) => ({
+      id,
+      ...rental,
+    }));
+
+    // 2. Get all cars
+    const carsSnap = await db.ref("cars").once("value");
+    const carsData = carsSnap.val() || {};
+
+    // 3. Enrich rentals with car details
+    const enriched = rentals.map((rental) => {
+      const car = carsData[rental.carId] || {};
+      return {
+        ...rental,
+        carName: car.title || "Unknown Car",
+        carImage: car.image || null,
+        carBrand: car.brand || null,
+      };
+    });
+
+    // 4. Filter rentals based on type
+    const filtered = enriched.filter((r) => {
+      const start = new Date(r.startDate).getTime();
+      const end = new Date(r.endDate).getTime();
+
+      switch (filterType) {
+        case "past":
+          return end < now;
+        case "current":
+          return start <= now && now <= end;
+        case "future":
+          return start > now;
+        default:
+          return true;
+      }
+    });
+
+    console.log(filtered);
+
+    res.json(filtered);
+  } catch (err) {
+    console.error("Get rentals error:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
