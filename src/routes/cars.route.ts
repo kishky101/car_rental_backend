@@ -341,14 +341,20 @@ router.get("/rentals", verifyFirebaseToken, async (req, res) => {
     const filtered = enriched.filter((r) => {
       const start = new Date(r.startDate).getTime();
       const end = new Date(r.endDate).getTime();
+      const status = r.status || "active";
 
       switch (filterType) {
         case "past":
-          return end < now;
+          return end < now || status === "returned" || status === "cancelled";
         case "current":
-          return start <= now && now <= end;
+          return (
+            start <= now &&
+            now <= end &&
+            status !== "returned" &&
+            status !== "cancelled"
+          );
         case "future":
-          return start > now;
+          return start > now && status !== "returned" && status !== "cancelled";
         default:
           return true;
       }
@@ -359,6 +365,60 @@ router.get("/rentals", verifyFirebaseToken, async (req, res) => {
     res.json(filtered);
   } catch (err) {
     console.error("Get rentals error:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+router.post("/rentals/return", verifyFirebaseToken, async (req, res) => {
+  try {
+    console.log("Return request body:", req.body);
+    const { rentalId, carId } = req.body;
+    const uid = (req as any).user.uid;
+
+    if (!rentalId || !carId) {
+      res.status(400).json({ message: "Missing rentalId or carId" });
+      return;
+    }
+
+    // Mark rental as returned
+    await db.ref(`rentals/${uid}/${rentalId}`).update({
+      status: "returned",
+      returnedAt: Date.now(),
+    });
+
+    // Mark car as available again
+    await db.ref(`cars/${carId}`).update({ isAvailable: true });
+
+    res.json({ message: "Car returned successfully" });
+  } catch (err) {
+    console.error("Return error:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
+// Cancel a future rental
+router.post("/rentals/cancel", verifyFirebaseToken, async (req, res) => {
+  try {
+    const { rentalId, carId } = req.body;
+    const uid = (req as any).user.uid;
+
+    if (!rentalId || !carId) {
+      res.status(400).json({ message: "Missing rentalId or carId" });
+      return;
+    }
+
+    // Mark rental as cancelled
+    await db.ref(`rentals/${uid}/${rentalId}`).update({
+      status: "cancelled",
+      cancelledAt: Date.now(),
+    });
+
+    // Mark car as available again
+    await db.ref(`cars/${carId}`).update({ isAvailable: true });
+
+    res.json({ message: "Rental cancelled successfully" });
+  } catch (err) {
+    console.error("Cancel error:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
